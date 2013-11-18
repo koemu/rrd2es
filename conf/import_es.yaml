@@ -1,0 +1,70 @@
+## 入力内容
+rrd_file_path:              /var/www/html/cacti/rra
+rrd_bin_path:               /opt/rrdtool-1.4.999/bin/rrdtool
+cacti_cli_path:             /var/www/html/cacti/cli
+db_server_connect:          mysql://cacti:cacti@127.0.0.1/cacti
+es_server:                  saito-hb-vm102
+analysis_range:             30
+## 分析
+analysis:
+    -
+        name         : "<graph_name>"
+        cf           : MAX
+        cf_sum       : AVERAGE
+        rrdfile      : "(.+)_hdd_free_([0-9]+).rrd"
+        rrdname      : hdd_used
+        multiple     : 1024
+        base         : 1024
+        unit         : "bytes"
+    -
+        name         : "<host_name> - Load Average (1min)"
+        cf           : MAX
+        rrdfile      : "(.+)_load_1min_([0-9]+).rrd"
+        rrdname      : load_1min
+        unit         : "queues"
+    -
+        name         : "<host_name> - CPU Capacity (%)"
+        cf           : MAX
+        rrdfile      : "(.+)_cpu_([0-9]+).rrd"
+        rrdname      : cpu
+        unit         : "%"
+        multiple     : 100
+    -
+        name         : "<host_name> - CPU Capacity (iowait%)"
+        cf           : MAX
+        rrdfile      : "(.+)_stat_cpu_nice_([0-9]+).rrd"
+        rrdname      : STAT_CPU_iowait
+        unit         : "%"
+    -
+        name         : "<graph_name> (IN)"
+        cf           : MAX
+        rrdfile      : "(.+)_traffic_(out|in)_([0-9]+).rrd"
+        rrdname      : traffic_in
+        unit         : "bps"
+    -
+        name         : "<graph_name> (OUT)"
+        cf           : MAX
+        rrdfile      : "(.+)_traffic_(out|in)_([0-9]+).rrd"
+        rrdname      : traffic_out
+        unit         : "bps"
+    -
+        name         : "<host_name> - SYN Received"
+        cf           : MAX
+        rrdfile      : "(.+)_(closewait|established)_([0-9]+).rrd"
+        rrdname      : synrecv
+        unit         : "Connections"
+    -
+        name         : "<host_name> - RAM Usage"
+        cf           : MAX
+        cf_sum       : AVERAGE
+        rrdfile      : "(.+)_usedreal_([0-9]+).rrd"
+        rrdname      : usedReal
+        multiple     : 1024
+        base         : 1024
+        unit         : "bytes"
+    -
+        name         : "<host_name> - Disk I/O Time"
+        cf           : MAX
+        rrdfile      : "(.+)_disk_io_time_weghtd_([0-9]+).rrd"
+        rrdname      : DISK_io_time
+        unit         : "msec."
