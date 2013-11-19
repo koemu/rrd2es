@@ -102,7 +102,7 @@ def getHistoricalData( context, analysis, params, last_update ):
     gen_params = []
 
     xport_params.append( "--start=%d-%dday" % ( last_update, context[ "analysis_range" ] ) )
-    xport_params.append( "--end=%d+%dday" % ( last_update, context[ "analysis_range" ] ) )
+    xport_params.append( "--end=%d" % ( last_update ) )
     xport_params.append( "--step=300" )
     xport_params.append( "--json" )
 
@@ -200,7 +200,8 @@ def setRecord( context, hostname, graph_name, historical_data ):
             "datetime":   datetime.datetime.fromtimestamp( info[ "start" ] + info[ "step" ] * step ),
             "value":      record[0]
             }
-        result = es.index( index = index_name, doc_type = doctype, id = step, body = insert_data )
+        logging.debug( insert_data )
+        result = es.index( index = index_name, doc_type = doctype, body = insert_data )
         logging.debug( result )
 
 #-----------------------------------------------
