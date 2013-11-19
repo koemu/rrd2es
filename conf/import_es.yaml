@@ -4,7 +4,9 @@ rrd_bin_path:               /opt/rrdtool-1.4.999/bin/rrdtool
 cacti_cli_path:             /var/www/html/cacti/cli
 db_server_connect:          mysql://cacti:cacti@127.0.0.1/cacti
 es_server:                  saito-hb-vm102
-analysis_range:             7
+analysis_range:             1
+import_days:                10
+doctype:                    "cacti"
 ## 分析
 analysis:
     -
@@ -17,20 +19,13 @@ analysis:
         base         : 1024
         unit         : "bytes"
     -
-        name         : "<host_name> - Load Average (1min)"
+        name         : "Load Average (1min)"
         cf           : MAX
         rrdfile      : "(.+)_load_1min_([0-9]+).rrd"
         rrdname      : load_1min
         unit         : "queues"
     -
-        name         : "<host_name> - CPU Capacity (%)"
-        cf           : MAX
-        rrdfile      : "(.+)_cpu_([0-9]+).rrd"
-        rrdname      : cpu
-        unit         : "%"
-        multiple     : 100
-    -
-        name         : "<host_name> - CPU Capacity (iowait%)"
+        name         : "CPU Capacity (iowait%)"
         cf           : MAX
         rrdfile      : "(.+)_stat_cpu_nice_([0-9]+).rrd"
         rrdname      : STAT_CPU_iowait
@@ -49,13 +44,13 @@ analysis:
         rrdname      : traffic_out
         unit         : "bps"
     -
-        name         : "<host_name> - SYN Received"
+        name         : "SYN Received"
         cf           : MAX
         rrdfile      : "(.+)_(closewait|established)_([0-9]+).rrd"
         rrdname      : synrecv
         unit         : "Connections"
     -
-        name         : "<host_name> - RAM Usage"
+        name         : "RAM Usage"
         cf           : MAX
         cf_sum       : AVERAGE
         rrdfile      : "(.+)_usedreal_([0-9]+).rrd"
@@ -64,7 +59,7 @@ analysis:
         base         : 1024
         unit         : "bytes"
     -
-        name         : "<host_name> - Disk I/O Time"
+        name         : "Disk I/O Time"
         cf           : MAX
         rrdfile      : "(.+)_disk_io_time_weghtd_([0-9]+).rrd"
         rrdname      : DISK_io_time

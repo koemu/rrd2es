@@ -34,29 +34,6 @@ class HOST( Entity ):
 
 #-----------------------------------------------
 
-def getParam( context, analysis, filename ):
-    """
-    パラメータを組み立てます
-    @param context  設定情報
-    @param analysis 分析時に利用する情報を設定します
-    @param filename RRDファイルのフルパスを設定します
-    @return 組み立てたパラメータの配列を返します
-    """
-    logging.debug( "START" )
-    
-    def_params = []
-    inverse = analysis.get( "inverse", 0 )
-    shift_time = context[ "analysis_range" ] * 24 * 60 * 60
-
-    def_params.append( "DEF:data1_orig=%s:%s:%s" % ( filename, analysis[ "rrdname" ], analysis[ "cf" ] ) )
-    def_params.append( "CDEF:data1=data1_orig,%s,*" % analysis.get( "multiple", "1" ) )
-
-    logging.debug( "END" )
-
-    return def_params
-
-#-----------------------------------------------
-
 def getLastUpdate( context, rrdfile ):
     """
     RRDファイルの最終更新日を取得します
@@ -87,48 +64,6 @@ def getLastUpdate( context, rrdfile ):
 
 #-----------------------------------------------
 
-def getHistoricalData( context, analysis, params, last_update ):
-    """
-    RRDToolでデータを取得します
-    @param context  設定情報
-    @param analysis 分析時に利用する情報を設定します
-    @param params   組み立てたパラメータを指定します
-    @param last_update 最終更新日を設定します
-    @return 成功で0  失敗でそれ以外を返します
-    """
-    logging.debug( "START" )
-    
-    xport_params = []
-    gen_params = []
-
-    xport_params.append( "--start=%d-%dday" % ( last_update, context[ "analysis_range" ] ) )
-    xport_params.append( "--end=%d" % ( last_update ) )
-    xport_params.append( "--step=300" )
-    xport_params.append( "--json" )
-
-    gen_params.append( "XPORT:data1:\"Data\"" )
-
-    full_param = "%s xport %s %s %s" % (
-        context[ "rrd_bin_path" ],
-        " ".join( xport_params ),
-        " ".join( params ),
-        " ".join( gen_params )
-        )
-    
-    logging.debug( full_param )
-    retval = commands.getstatusoutput( full_param )
-    if retval[0] != 0:
-        logging.error( retval[1] )
-        logging.error( full_param )
-        logging.debug( "EXIT" )
-        return None
-
-    logging.debug( "END" )
-
-    return json.loads( retval[1].replace( "],", "]", 1 ) )
-
-#-----------------------------------------------
-
 def parseRRDFiles( context, hostlist ):
     """
     RRDFileを解析します
@@ -145,11 +80,9 @@ def parseRRDFiles( context, hostlist ):
     for host_info in hostlist:
         subrecords_current = []
         subrecords_predict = []
-        logging.info( "Predicting host: %s" % host_info[ "hostname" ] )
+        logging.info( "Importing host: %s" % host_info[ "hostname" ] )
         # 分析項目一覧
         for analysis_info in context[ "analysis" ]:
-            logging.debug( "Analysis: %s" % analysis_info[ "name" ] )
-
             # 利用するRRDファイルの情報を取得
             rrdfile_infos = []
             for rrdfile_info in host_info[ "rrdfiles" ]:
@@ -161,14 +94,17 @@ def parseRRDFiles( context, hostlist ):
                 continue
             # RRDファイル一覧
             for rrdfile_info in rrdfile_infos:
-                records = parseRRDFile( context, rrdfile_info, analysis_info )
-                if records is None:
-                    continue
-                # ElasticSearchに挿入
-                graph_name = analysis_info[ "name" ]
-                graph_name = graph_name.replace( "<graph_name>", rrdfile_info[ "name" ] )
-                graph_name = graph_name.replace( "<host_name>", host_info[ "hostname" ] )
-                setRecord( context, host_info[ "hostname" ], graph_name, records )
+                logging.info( "Importing data: %s" % rrdfile_info[ "name" ] )
+                for i in range( context[ "import_days" ] / context[ "analysis_range" ] ):
+                    logging.info( "Day: %d" % i )
+                    records = parseRRDFile( context, rrdfile_info, analysis_info, i + 1, i )
+                    if records is None:
+                        continue
+                    # ElasticSearchに挿入
+                    graph_name = analysis_info[ "name" ]
+                    graph_name = graph_name.replace( "<graph_name>", rrdfile_info[ "name" ] )
+                    graph_name = graph_name.replace( "<host_name>", host_info[ "hostname" ] )
+                    setRecord( context, host_info[ "hostname" ], graph_name, records )
 
     logging.debug( "END" )
 
@@ -190,27 +126,44 @@ def setRecord( context, hostname, graph_name, historical_data ):
 
     info = historical_data[ "meta" ]
     index_name  = "%s" % ( hostname.lower() )
-    doctype     = "cacti"
+    index_lists = []
+
+    meta = {
+        "index": {
+                "_index": index_name,
+                "_type":  context[ "doctype" ]
+            }
+        }
+    meta_json = json.dumps( meta )
 
     for record in historical_data[ "data" ]:
         step += 1
         insert_data = {
             "hostname":   hostname,
             "graph_name": graph_name,
-            "@timestamp": datetime.datetime.utcfromtimestamp( info[ "start" ] + info[ "step" ] * step ),
+            "@timestamp": datetime.datetime.fromtimestamp( info[ "start" ] + info[ "step" ] * step ).isoformat(),
             "value":      record[0]
             }
-        logging.debug( insert_data )
-        result = es.index( index = index_name, doc_type = doctype, body = insert_data )
-        logging.debug( result )
+        insert_json = json.dumps( insert_data )
+        logging.debug( insert_json )
+        index_lists.append( meta_json )
+        index_lists.append( insert_json )
+
+    result = es.bulk( body = "\n".join( index_lists ) )
+    logging.debug( result )
 
 #-----------------------------------------------
 
-def parseRRDFile( context, rrdfile_info, analysis_info ):
+def parseRRDFile( context, rrdfile_info, analysis, start_day, end_day ):
     """
     1つのRRDファイルをパースします
     """
     logging.debug( "START" )
+
+    # データを取得    xport_params = []
+    gen_params = []
+    xport_params = []
+    shift_time = context[ "analysis_range" ] * 24 * 60 * 60
 
     archive_file = os.path.basename( rrdfile_info[ "rrdfile" ] )
     rrdfile = os.path.join( context[ "rrd_file_path" ], archive_file )
@@ -222,17 +175,32 @@ def parseRRDFile( context, rrdfile_info, analysis_info ):
         logging.error( "Unable to get last update: %s" % rrdfile )
         return None
 
-    # データを取得
-    params = getParam( context, analysis_info, rrdfile )
-    historical_data = getHistoricalData( context, analysis_info, params, last_update )
-    if historical_data is None:
-        logging.error( "Unable to get historical data: %s" % rrdfile )
+    xport_params.append( "--start=%d-%dday" % ( last_update, start_day ) )
+    xport_params.append( "--end=%d-%dday" % ( last_update, end_day ) )
+    xport_params.append( "--step=60" )
+    xport_params.append( "--json" )
+
+    gen_params.append( "DEF:data1_orig=%s:%s:%s" % ( rrdfile, analysis[ "rrdname" ], analysis[ "cf" ] ) )
+    gen_params.append( "CDEF:data1=data1_orig,%s,*" % analysis.get( "multiple", "1" ) )
+    gen_params.append( "XPORT:data1:\"Data\"" )
+
+    full_param = "%s xport %s %s" % (
+        context[ "rrd_bin_path" ],
+        " ".join( xport_params ),
+        " ".join( gen_params )
+        )
+    
+    logging.debug( full_param )
+    retval = commands.getstatusoutput( full_param )
+    if retval[0] != 0:
+        logging.error( retval[1] )
+        logging.error( full_param )
         logging.debug( "EXIT" )
         return None
 
     logging.debug( "END" )
 
-    return historical_data
+    return json.loads( retval[1].replace( "],", "]", 1 ) )
 
 #-----------------------------------------------
 
