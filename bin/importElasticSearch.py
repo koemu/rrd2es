@@ -197,7 +197,7 @@ def setRecord( context, hostname, graph_name, historical_data ):
         insert_data = {
             "hostname":   hostname,
             "graph_name": graph_name,
-            "datetime":   datetime.datetime.fromtimestamp( info[ "start" ] + info[ "step" ] * step ),
+            "@timestamp": datetime.datetime.utcfromtimestamp( info[ "start" ] + info[ "step" ] * step ),
             "value":      record[0]
             }
         logging.debug( insert_data )

@@ -4,7 +4,7 @@ rrd_bin_path:               /opt/rrdtool-1.4.999/bin/rrdtool
 cacti_cli_path:             /var/www/html/cacti/cli
 db_server_connect:          mysql://cacti:cacti@127.0.0.1/cacti
 es_server:                  saito-hb-vm102
-analysis_range:             30
+analysis_range:             7
 ## 分析
 analysis:
     -
@@ -35,6 +35,7 @@ analysis:
         rrdfile      : "(.+)_stat_cpu_nice_([0-9]+).rrd"
         rrdname      : STAT_CPU_iowait
         unit         : "%"
+        multiple     : 100
     -
         name         : "<graph_name> (IN)"
         cf           : MAX
