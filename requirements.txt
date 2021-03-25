@@ -1,6 +1,6 @@
 Elixir==0.7.1
 MySQL-python==1.2.4
-PyYAML==3.10
+PyYAML==5.4
 SQLAlchemy==0.7.0
 elasticsearch==0.4.3
 urllib3==1.7.1
